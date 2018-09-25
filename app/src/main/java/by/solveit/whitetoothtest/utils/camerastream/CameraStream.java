@@ -23,6 +23,8 @@ import java.util.Collections;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresPermission;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
 
 public class CameraStream {
 
@@ -32,9 +34,13 @@ public class CameraStream {
     private static final String LOG_TAG = CameraStream.class.getName();
 
     private boolean started;
+    private boolean thereWasDeviceOpening;
+    private boolean thereWasDeviceClosing;
     private int lensFacing;
     @NonNull
     private CameraManager cameraManager;
+    @NonNull
+    private MutableLiveData<State> stateLiveDate;
     @Nullable
     private CameraManager.AvailabilityCallback callback;
     @Nullable
@@ -47,12 +53,13 @@ public class CameraStream {
     public CameraStream(@NonNull Context context, final int lensFacing) {
         cameraManager = getCameraManager(context);
         this.lensFacing = lensFacing;
+        stateLiveDate = new MutableLiveData<>();
+        stateLiveDate.postValue(State.CLOSED);
     }
 
     @RequiresPermission(Manifest.permission.CAMERA)
     public synchronized boolean start(
             @Nullable Size requiredSize,
-            @NonNull StateListener stateListener,
             @NonNull ImageListener imageListener,
             @NonNull Handler handler
     ) {
@@ -63,7 +70,6 @@ public class CameraStream {
             this.callback = new CameraAvailabilityCallback(
                     cameraId,
                     requiredSize,
-                    stateListener,
                     imageListener,
                     handler
             );
@@ -73,23 +79,32 @@ public class CameraStream {
     }
 
     public synchronized void stop() {
-        if (callback != null) {
-            cameraManager.unregisterAvailabilityCallback(callback);
-            callback = null;
+        if (!started) return;
+        if (session != null) {
+            session.close();
+            session = null;
+        }
+        if (device != null) {
+            thereWasDeviceClosing = true;
+            device.close();
+            device = null;
         }
         if (reader != null) {
             reader.close();
             reader = null;
         }
-        if (device != null) {
-            device.close();
-            device = null;
+        if (callback != null) {
+            cameraManager.unregisterAvailabilityCallback(callback);
+            callback = null;
         }
-        if (session != null) {
-            session.close();
-            session = null;
-        }
+        if (!State.CLOSED.equals(stateLiveDate.getValue()))
+            stateLiveDate.postValue(State.CLOSED);
         started = false;
+    }
+
+    @NonNull
+    public LiveData<State> getStateLiveDate() {
+        return stateLiveDate;
     }
 
     @NonNull
@@ -131,8 +146,6 @@ public class CameraStream {
         @Nullable
         private Size requiredSize;
         @NonNull
-        private StateListener stateListener;
-        @NonNull
         private ImageListener imageListener;
         @NonNull
         private Handler handler;
@@ -140,13 +153,11 @@ public class CameraStream {
         CameraAvailabilityCallback(
                 @NonNull String cameraId,
                 @Nullable Size requiredSize,
-                @NonNull StateListener stateListener,
                 @NonNull ImageListener imageListener,
                 @NonNull Handler handler
         ) {
             super();
             this.cameraId = cameraId;
-            this.stateListener = stateListener;
             this.requiredSize = requiredSize;
             this.imageListener = imageListener;
             this.handler = handler;
@@ -157,19 +168,25 @@ public class CameraStream {
         public void onCameraAvailable(@NonNull String availableCameraId) {
             super.onCameraAvailable(availableCameraId);
             if (cameraId.equals(availableCameraId)) {
-                try {
-                    stateListener.onStateChanged(State.LOADING);
+                if (thereWasDeviceClosing) thereWasDeviceClosing = false;
+                else try {
                     if (reader != null) reader.close();
                     reader = getReaderForCamera(cameraId, requiredSize);
                     reader.setOnImageAvailableListener(reader -> {
                         Image image = reader.acquireLatestImage();
                         if (!imageListener.onNewImage(image)) image.close();
                     }, handler);
-                    cameraManager.openCamera(
-                            cameraId,
-                            new CameraStateCallback(stateListener, handler),
-                            handler
-                    );
+                    thereWasDeviceOpening = true;
+                    try {
+                        cameraManager.openCamera(
+                                cameraId,
+                                new CameraStateCallback(handler),
+                                handler
+                        );
+                    } catch (CameraAccessException ex) {
+                        thereWasDeviceOpening = false;
+                        throw ex;
+                    }
                 } catch (CameraAccessException ex) {
                     Log.e(LOG_TAG, ex.getMessage(), ex);
                 }
@@ -179,8 +196,11 @@ public class CameraStream {
         @Override
         public void onCameraUnavailable(@NonNull String unavailableCameraId) {
             super.onCameraUnavailable(unavailableCameraId);
-            if (cameraId.equals(unavailableCameraId))
-                stateListener.onStateChanged(State.UNAVAILABLE);
+            if (cameraId.equals(unavailableCameraId)) {
+                if (thereWasDeviceOpening) thereWasDeviceOpening = false;
+                else if (!State.CLOSED.equals(stateLiveDate.getValue()))
+                    stateLiveDate.postValue(State.CLOSED);
+            }
         }
 
         @NonNull
@@ -208,27 +228,27 @@ public class CameraStream {
     private class CameraStateCallback extends CameraDevice.StateCallback {
 
         @NonNull
-        private StateListener stateListener;
-        @NonNull
         private Handler handler;
 
-        CameraStateCallback(@NonNull StateListener stateListener, @NonNull Handler handler) {
+        CameraStateCallback(@NonNull Handler handler) {
             super();
-            this.stateListener = stateListener;
             this.handler = handler;
         }
 
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
             try {
-                if (device != null) device.close();
+                if (device != null) {
+                    thereWasDeviceClosing = true;
+                    device.close();
+                }
                 device = camera;
                 Surface surface = reader.getSurface();
                 CaptureRequest.Builder builder = camera.createCaptureRequest(TEMPLATE_TYPE);
                 builder.addTarget(surface);
                 camera.createCaptureSession(
                         Collections.singletonList(surface),
-                        new SessionStateCallback(builder.build(), stateListener, handler),
+                        new SessionStateCallback(builder.build(), handler),
                         handler
                 );
             } catch (CameraAccessException ex) {
@@ -253,18 +273,14 @@ public class CameraStream {
         @NonNull
         private CaptureRequest request;
         @NonNull
-        private StateListener stateListener;
-        @NonNull
         private Handler handler;
 
         SessionStateCallback(
                 @NonNull CaptureRequest request,
-                @NonNull StateListener stateListener,
                 @NonNull Handler handler
         ) {
             super();
             this.request = request;
-            this.stateListener = stateListener;
             this.handler = handler;
         }
 
@@ -274,7 +290,8 @@ public class CameraStream {
                 if (CameraStream.this.session != null) CameraStream.this.session.close();
                 CameraStream.this.session = session;
                 session.setRepeatingRequest(request, null, handler);
-                stateListener.onStateChanged(State.AVAILABLE);
+                if (!State.OPENED.equals(stateLiveDate.getValue()))
+                    stateLiveDate.postValue(State.OPENED);
             } catch (CameraAccessException ex) {
                 Log.e(LOG_TAG, ex.getMessage(), ex);
             }

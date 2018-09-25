@@ -3,11 +3,11 @@ package by.solveit.whitetoothtest.screens.main;
 import android.app.Application;
 import android.hardware.camera2.CameraMetadata;
 import android.media.Image;
-import android.media.ImageReader;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
+import androidx.lifecycle.LiveData;
 import by.solveit.whitetoothtest.utils.Threads;
 import by.solveit.whitetoothtest.utils.camerastream.CameraStream;
 import by.solveit.whitetoothtest.utils.camerastream.State;
@@ -33,7 +33,6 @@ public class MainViewModel extends AndroidViewModel {
     public void startCamera() {
         stream.start(
                 null,
-                this::onStateChanged,
                 this::onNewImage,
                 Threads.backgroundHandler()
         );
@@ -43,13 +42,14 @@ public class MainViewModel extends AndroidViewModel {
         stream.stop();
     }
 
+    @NonNull
+    public LiveData<State> getCameraState() {
+        return stream.getStateLiveDate();
+    }
+
     private boolean onNewImage(Image image) {
         Log.d(LOG_TAG, "New image was received " + image.toString());
         Image.Plane[] planes = image.getPlanes();
         return false;
-    }
-
-    private void onStateChanged(State state) {
-        Log.d(LOG_TAG, "Camera state was reached " + state);
     }
 }
