@@ -1,7 +1,6 @@
 package by.solveit.whitetoothtest.utils.camerastream;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.ImageFormat;
 import android.hardware.camera2.CameraAccessException;
@@ -62,7 +61,7 @@ public class CameraStream {
             @Nullable Size requiredSize,
             @NonNull ImageListener imageListener,
             @NonNull Handler handler
-    ) {
+    ) throws SecurityException {
         if (started) return true;
         String cameraId = getCameraId(lensFacing);
         started = cameraId != null;
@@ -115,7 +114,7 @@ public class CameraStream {
     }
 
     @Nullable
-    private String getCameraId(int requiredFacing) {
+    private String getCameraId(final int requiredFacing) {
         try {
             String[] cameraIdList = cameraManager.getCameraIdList();
             for (String cameraId : cameraIdList) {
@@ -163,9 +162,8 @@ public class CameraStream {
             this.handler = handler;
         }
 
-        @SuppressLint("MissingPermission")
         @Override
-        public void onCameraAvailable(@NonNull String availableCameraId) {
+        public void onCameraAvailable(@NonNull String availableCameraId) throws SecurityException {
             super.onCameraAvailable(availableCameraId);
             if (cameraId.equals(availableCameraId)) {
                 if (thereWasDeviceClosing) thereWasDeviceClosing = false;
@@ -174,7 +172,7 @@ public class CameraStream {
                     reader = getReaderForCamera(cameraId, requiredSize);
                     reader.setOnImageAvailableListener(reader -> {
                         Image image = reader.acquireLatestImage();
-                        if (!imageListener.onNewImage(image)) image.close();
+                        if (image != null && !imageListener.onNewImage(image)) image.close();
                     }, handler);
                     thereWasDeviceOpening = true;
                     try {
