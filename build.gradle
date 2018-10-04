@@ -13,6 +13,10 @@ allprojects {
     repositories {
         google()
         jcenter()
+        maven {
+            name 'Sonatype SNAPSHOTs';
+            url 'https://oss.sonatype.org/content/repositories/snapshots/'
+        }
     }
 }
 

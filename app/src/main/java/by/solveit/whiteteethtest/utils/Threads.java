@@ -1,4 +1,4 @@
-package by.solveit.whitetoothtest.utils;
+package by.solveit.whiteteethtest.utils;
 
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -8,13 +8,13 @@ import java.util.concurrent.Executor;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-public class Threads {
+public final class Threads {
 
     private static final String BACKGROUND_THREAD_NAME = "background_thread";
     private static final Object BACKGROUND_THREAD_INIT_LOCK = new Object();
 
     @Nullable
-    private volatile static Handler backgroundHandler;
+    private static volatile Handler backgroundHandler;
 
     @NonNull
     public static Handler backgroundHandler() {
