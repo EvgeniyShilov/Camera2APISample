@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
+import by.solveit.whiteteethtest.R;
 import by.solveit.whiteteethtest.utils.Graphics;
 import by.solveit.whiteteethtest.utils.Threads;
 import io.fotoapparat.result.BitmapPhoto;
@@ -26,11 +27,14 @@ public class PreviewViewModel extends AndroidViewModel {
     @NonNull
     private MutableLiveData<Bitmap> bitmapLiveData;
     @NonNull
+    private MutableLiveData<Integer> messageLiveData;
+    @NonNull
     private FaceDetector faceDetector;
 
     public PreviewViewModel(@NonNull Application application, @NonNull BitmapPhoto photo) {
         super(application);
         bitmapLiveData = new MutableLiveData<>();
+        messageLiveData = new MutableLiveData<>();
         faceDetector = new FaceDetector.Builder(application)
                 .setLandmarkType(FaceDetector.ALL_LANDMARKS)
                 .setProminentFaceOnly(true)
@@ -47,12 +51,18 @@ public class PreviewViewModel extends AndroidViewModel {
                         .whitenTeeth(rotatedBitmap, mouthLocation);
                 bitmapLiveData.postValue(whitenTeethBitmap);
                 rotatedBitmap.recycle();
-            }
+            } else messageLiveData.postValue(R.string.error_no_mouth);
         });
     }
 
+    @NonNull
     LiveData<Bitmap> bitmapLiveData() {
         return bitmapLiveData;
+    }
+
+    @NonNull
+    LiveData<Integer> messageLiveData() {
+        return messageLiveData;
     }
 
     @NonNull

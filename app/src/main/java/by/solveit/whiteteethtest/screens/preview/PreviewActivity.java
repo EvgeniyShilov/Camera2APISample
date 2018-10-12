@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.widget.ImageView;
 
+import com.google.android.material.snackbar.Snackbar;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -41,10 +43,10 @@ public final class PreviewActivity extends AppCompatActivity {
         setContentView(R.layout.activity_preview);
         ButterKnife.bind(this);
         viewModel.bitmapLiveData().observe(this, ivPreview::setImageBitmap);
+        viewModel.messageLiveData().observe(this, this::showMessage);
     }
 
-    @Override
-    protected void onStop() {
-        super.onStop();
+    private void showMessage(@Nullable Integer messageId) {
+        if (messageId != null) Snackbar.make(ivPreview, messageId, Snackbar.LENGTH_LONG).show();
     }
 }

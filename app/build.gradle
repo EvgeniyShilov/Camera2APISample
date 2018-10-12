@@ -25,12 +25,13 @@ dependencies {
     def lifecycle_version = "2.0.0"
     def butterknife_version = "9.0.0-SNAPSHOT"
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation 'androidx.appcompat:appcompat:1.0.0'
+    implementation "androidx.appcompat:appcompat:1.0.0"
     implementation "androidx.lifecycle:lifecycle-extensions:$lifecycle_version"
     implementation "androidx.lifecycle:lifecycle-common-java8:$lifecycle_version"
-    implementation 'com.google.android.gms:play-services-vision:15.0.2'
+    implementation "com.google.android.material:material:1.0.0"
+    implementation "com.google.android.gms:play-services-vision:16.2.0"
+    implementation "com.google.code.gson:gson:2.8.5"
     implementation "com.jakewharton:butterknife:$butterknife_version"
     implementation "io.fotoapparat:fotoapparat:2.4.0"
-    implementation 'androidx.constraintlayout:constraintlayout:1.1.2'
     annotationProcessor "com.jakewharton:butterknife-compiler:$butterknife_version"
 }
